@@ -23,6 +23,13 @@ import cerberus.slack.slack_client as slackcli
 import cerberus.prometheus.client as promcli
 import cerberus.database.client as dbcli
 
+CERBERUS_WORKDIR = os.environ.get("CERBERUS_WORKDIR", "/tmp/cerberus")
+os.makedirs(CERBERUS_WORKDIR, exist_ok=True)
+
+TIME_TRACKER_PATH = os.path.join(CERBERUS_WORKDIR, "time_tracker.json")
+FINAL_STATUS_PATH = os.path.join(CERBERUS_WORKDIR, "final_cerberus_info.json")
+CERBERUS_OUTPUT_PATH = os.environ.get("CERBERUS_OUTPUT_PATH", os.path.join(CERBERUS_WORKDIR, "cerberus.report"))
+
 
 def smap(f):
     return f()
@@ -45,14 +52,15 @@ def init_worker():
 
 # Publish the cerberus status
 def publish_cerberus_status(status):
-    with open("/tmp/cerberus_status", "w+") as file:
+    with open(os.path.join(CERBERUS_WORKDIR, "cerberus_status"), "w+") as file:
         file.write(str(status))
 
 
 def print_final_status_json(iterations, cerberus_status, exit_status_code):
     status_json = {"iterations": iterations, "cluster_health": cerberus_status, "exit_status": exit_status_code}
+    os.makedirs(os.path.dirname(FINAL_STATUS_PATH), exist_ok=True)
 
-    with open("final_cerberus_info.json", "w") as file:
+    with open(FINAL_STATUS_PATH, "w") as file:
         file.write(str(status_json))
 
     logging.info("Final status information written to final_cerberus_info.json")
@@ -70,7 +78,8 @@ def record_time(time_tracker):
                     iterations += 1
             average[check] /= iterations
         time_tracker["Average"] = average
-    with open("./time_tracker.json", "w+") as file:
+    os.makedirs(os.path.dirname(TIME_TRACKER_PATH), exist_ok=True)
+    with open(TIME_TRACKER_PATH, "w+") as file:
         json.dump(time_tracker, file, indent=4, separators=(",", ": "))
 
 
@@ -590,7 +599,7 @@ if __name__ == "__main__":
     logging.basicConfig(
         level=logging.INFO,
         format="%(asctime)s [%(levelname)s] %(message)s",
-        handlers=[logging.FileHandler(options.output, mode="w"), logging.StreamHandler()],
+        handlers=[logging.FileHandler(CERBERUS_OUTPUT_PATH, mode="w"), logging.StreamHandler()],
     )
     if options.cfg is None:
         logging.error("Please check if you have passed the config")
